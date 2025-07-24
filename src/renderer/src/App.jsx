@@ -1,9 +1,10 @@
+// src/App.jsx
 import React, { useEffect, useState } from 'react'
 import socket from './socket'
 
 import LockScreen from './pages/LockScreen'
 import GamesPage from './pages/GamesPage'
-// import User from './pages/User' // kerak bo'lsa
+import HotkeyPassword from './pages/HotkeyPassword'
 
 export default function App() {
   const [locked, setLocked] = useState(true)
@@ -12,16 +13,12 @@ export default function App() {
   useEffect(() => {
     let myMac = null
 
-    // MAC-ni olamiz va status so‘raymiz
     window.api.getMac().then((addr) => {
       setMac(addr)
       myMac = addr
-      if (addr) {
-        socket.emit('get-status', addr)
-      }
+      if (addr) socket.emit('get-status', addr)
     })
 
-    // STATUS event — faqat o'z MAC uchun
     const handleStatus = (data) => {
       if (data.mac === myMac) setLocked(data.locked)
     }
@@ -43,6 +40,10 @@ export default function App() {
     }
   }, [])
 
-  if (locked) return <LockScreen />
-  return <GamesPage />
+  return (
+    <>
+      {locked ? <LockScreen /> : <GamesPage />}
+      <HotkeyPassword />
+    </>
+  )
 }

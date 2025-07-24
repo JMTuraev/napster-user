@@ -4,6 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import os from 'os'
 import { registerGameHandlers } from './gameHandlers.js'
+import { registerHotkeyHandlers } from './hotkeyHandler.js'
 
 // --- CSP PATCH: SOCKET.IO va boshqa kerakli resurslar uchun ---
 function patchCSP() {
@@ -83,6 +84,7 @@ function createWindow() {
 // --- App tayyor bo‘lsa ---
 app.whenReady().then(() => {
   electronApp.setAppUserModelId('com.electron')
+  registerHotkeyHandlers()
   patchCSP()
 
   app.on('browser-window-created', (_, window) => {

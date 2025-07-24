@@ -1,42 +1,48 @@
-// src/App.js
 import React, { useEffect, useState } from 'react'
 import socket from './socket'
 
-// Sahifalarni import qilamiz
 import LockScreen from './pages/LockScreen'
 import GamesPage from './pages/GamesPage'
-import User from './pages/User'
+// import User from './pages/User' // kerak bo'lsa
 
 export default function App() {
-  const [locked, setLocked] = useState(true) // Dastlab bloklangan
+  const [locked, setLocked] = useState(true)
+  const [mac, setMac] = useState(null)
 
   useEffect(() => {
-    socket.on('lock', (mac) => {
-      setLocked(true)
-      console.log('LOCK: ', mac)
+    let myMac = null
+
+    // MAC-ni olamiz va status so‘raymiz
+    window.api.getMac().then((addr) => {
+      setMac(addr)
+      myMac = addr
+      if (addr) {
+        socket.emit('get-status', addr)
+      }
     })
-    socket.on('unlock', (mac) => {
-      setLocked(false)
-      console.log('UNLOCK: ', mac)
-    })
+
+    // STATUS event — faqat o'z MAC uchun
+    const handleStatus = (data) => {
+      if (data.mac === myMac) setLocked(data.locked)
+    }
+    const handleLock = (addr) => {
+      if (addr === myMac) setLocked(true)
+    }
+    const handleUnlock = (addr) => {
+      if (addr === myMac) setLocked(false)
+    }
+
+    socket.on('status', handleStatus)
+    socket.on('lock', handleLock)
+    socket.on('unlock', handleUnlock)
+
     return () => {
-      socket.off('lock')
-      socket.off('unlock')
+      socket.off('status', handleStatus)
+      socket.off('lock', handleLock)
+      socket.off('unlock', handleUnlock)
     }
   }, [])
 
-  if (locked) {
-    // Faqat LockScreen sahifasini ko‘rsatadi
-    return <LockScreen />
-  }
-
-  // Bu yerda unlocked bo‘lsa asosiy UI chiqadi
-  return (
-    <div>
-      {/* Masalan, asosiy sahifalar */}
-      <GamesPage />
-      {/* User paneli yoki boshqa komponentlar ham bo‘lishi mumkin */}
-      {/* <User /> */}
-    </div>
-  )
+  if (locked) return <LockScreen />
+  return <GamesPage />
 }

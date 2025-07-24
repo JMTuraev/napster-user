@@ -1,48 +1,42 @@
+// src/App.js
 import React, { useEffect, useState } from 'react'
 import socket from './socket'
 
+// Sahifalarni import qilamiz
+import LockScreen from './pages/LockScreen'
+import GamesPage from './pages/GamesPage'
+import User from './pages/User'
+
 export default function App() {
-  const [mac, setMac] = useState(null)
-  const [locked, setLocked] = useState(true)
+  const [locked, setLocked] = useState(true) // Dastlab bloklangan
 
   useEffect(() => {
-    window.api.getMac().then((mac) => setMac(mac))
+    socket.on('lock', (mac) => {
+      setLocked(true)
+      console.log('LOCK: ', mac)
+    })
+    socket.on('unlock', (mac) => {
+      setLocked(false)
+      console.log('UNLOCK: ', mac)
+    })
+    return () => {
+      socket.off('lock')
+      socket.off('unlock')
+    }
   }, [])
 
-  useEffect(() => {
-    if (!mac) return
+  if (locked) {
+    // Faqat LockScreen sahifasini ko‘rsatadi
+    return <LockScreen />
+  }
 
-    // 👇 MUHIM: MAC-ni serverga bir marta yuboramiz
-    socket.emit('new-user', { mac })
-    console.log('📤 [USER] MAC serverga yuborildi:', mac)
-
-    // Lock/unlock eventlar
-    const onLock = (msgMac) => {
-      if (msgMac === mac) setLocked(true)
-    }
-    const onUnlock = (msgMac) => {
-      if (msgMac === mac) {
-        setLocked(false)
-        if (window.api?.appQuit) {
-          window.api.appQuit()
-        } else if (window?.close) {
-          window.close()
-        }
-      }
-    }
-    socket.on('lock', onLock)
-    socket.on('unlock', onUnlock)
-    return () => {
-      socket.off('lock', onLock)
-      socket.off('unlock', onUnlock)
-    }
-  }, [mac])
-
+  // Bu yerda unlocked bo‘lsa asosiy UI chiqadi
   return (
     <div>
-      <h2>MAC: {mac || '...'}</h2>
-      <h2 style={{ color: locked ? 'red' : 'green' }}>{locked ? 'LOCKED' : 'UNLOCKED'}</h2>
-      {/* Qolgan UI... shu yerda */}
+      {/* Masalan, asosiy sahifalar */}
+      <GamesPage />
+      {/* User paneli yoki boshqa komponentlar ham bo‘lishi mumkin */}
+      {/* <User /> */}
     </div>
   )
 }

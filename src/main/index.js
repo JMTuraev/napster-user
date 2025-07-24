@@ -4,8 +4,7 @@ import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 import os from 'os'
 import { registerGameHandlers } from './gameHandlers.js'
-import { setupWatchdog } from './watchdog.js' // <---- asosiy import
-import './socket-flag.js'
+
 // --- CSP PATCH: SOCKET.IO va boshqa kerakli resurslar uchun ---
 function patchCSP() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -37,11 +36,6 @@ function getMacAddress() {
   return null
 }
 ipcMain.handle('get-mac', () => getMacAddress())
-
-// --- Ilovani to‘liq yopish (user uchun appQuit) ---
-ipcMain.handle('app-quit', () => {
-  app.quit()
-})
 
 // --- Yangi Window yaratish ---
 function createWindow() {
@@ -96,8 +90,6 @@ app.whenReady().then(() => {
   })
 
   ipcMain.on('ping', () => console.log('pong'))
-
-  setupWatchdog() // <--- Watchdog va Task Scheduler ni sozlash
 
   registerGameHandlers()
   createWindow()

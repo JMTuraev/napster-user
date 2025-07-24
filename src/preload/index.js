@@ -59,10 +59,7 @@ const api = {
     } catch {
       return null
     }
-  },
-
-  // --- APP QUIT: Electron ilovasini butunlay yopish ---
-  appQuit: () => ipcRenderer.invoke('app-quit')
+  }
 }
 
 // --- Expose faqat bitta marta va contextIsolation rejimida ---

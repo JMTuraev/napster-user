@@ -11,10 +11,12 @@ function patchCSP() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
     const cspDirectives = [
       "default-src 'self'",
+      "img-src 'self' data: http://localhost:3000 http://192.168.1.10:5173",
       "connect-src 'self' ws://localhost:3000 http://localhost:3000 ws://192.168.1.10:3000 http://192.168.1.10:3000 ws://192.168.0.100:3000 http://192.168.0.100:3000",
-      "script-src 'self' 'unsafe-inline'", // Dev uchun, prodga chiqqanda 'unsafe-inline' ni olib tashlang!
-      "style-src 'self' 'unsafe-inline'" // Dev uchun, prodga chiqqanda 'unsafe-inline' ni olib tashlang!
+      "script-src 'self' 'unsafe-inline'", // Faqat dev uchun
+      "style-src 'self' 'unsafe-inline'" // Inline style qo‘llab-quvvatlansin
     ].join('; ')
+
     callback({
       responseHeaders: {
         ...details.responseHeaders,
@@ -83,9 +85,9 @@ function createWindow() {
 
 // --- App tayyor bo‘lsa ---
 app.whenReady().then(() => {
+  patchCSP()
   electronApp.setAppUserModelId('com.electron')
   registerHotkeyHandlers()
-  patchCSP()
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

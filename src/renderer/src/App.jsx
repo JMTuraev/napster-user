@@ -1,4 +1,3 @@
-// src/App.jsx
 import React, { useEffect, useState } from 'react'
 import socket from './socket'
 
@@ -10,21 +9,18 @@ export default function App() {
   const [locked, setLocked] = useState(true)
   const [mac, setMac] = useState(null)
   const [pcNumber, setPcNumber] = useState(null)
-  const [fontSize, setFontSize] = useState(36) // default font
+  const [fontSize, setFontSize] = useState(36)
 
-  // 🔐 1-USEEFFECT: MAC olish va status listenerlari
+  // 🔐 1-USEEFFECT: MAC olish va status listenerlari (O'ZGARTIRMAYMIZ)
   useEffect(() => {
     let myMac = null
 
-    // 💻 MAC addressni olish va statusni so‘rash
     window.api.getMac().then((addr) => {
-      console.log('📟 MAC USER:', addr)
       setMac(addr)
       myMac = addr
       if (addr) socket.emit('get-status', addr)
     })
 
-    // 🔒 Status yangilanishi
     const handleStatus = (data) => {
       if (data.mac === myMac) setLocked(data.locked)
     }
@@ -35,7 +31,6 @@ export default function App() {
       if (addr === myMac) setLocked(false)
     }
 
-    // 🖼️ Fon rasmni yangilash
     const handleBackgroundUpdate = ({ url }) => {
       if (url) {
         document.body.style.backgroundImage = `url(${url})`
@@ -63,32 +58,36 @@ export default function App() {
     if (!mac) return
 
     const channel = `receive-pc-ui-${mac}`
-    console.log('📡 Listening on:', channel)
-
-    const handlePcUi = (data) => {
-      console.log('📥 PC raqam keldi:', data)
+    const handlePcUiNumber = (data) => {
       if (data.mac === mac) {
+        console.log('🖥️ Kompyuter raqami:', data)
         setPcNumber(data.number || null)
-        setFontSize(36)
       }
     }
 
-    socket.on(channel, handlePcUi)
-
-    return () => {
-      socket.off(channel, handlePcUi)
-    }
+    socket.on(channel, handlePcUiNumber)
+    return () => socket.off(channel, handlePcUiNumber)
   }, [mac])
 
-  // 🧪 Test tugma: send-number-pc signal yuboradi
-  const handleSendNumber = () => {
-    socket.emit('send-number-pc')
-    console.log('📤 [Test] send-number-pc yuborildi')
-  }
+  // 🆕 3-USEEFFECT: Shrift o‘lchamini alohida olish
+  useEffect(() => {
+    if (!mac) return
+
+    const channel = `receive-pc-ui-${mac}`
+    const handlePcUiFont = (data) => {
+      if (data.mac === mac && typeof data.font_size === 'number') {
+        console.log('🔠 Font o‘lchami:', data.font_size)
+        setFontSize(data.font_size)
+      }
+    }
+
+    socket.on(channel, handlePcUiFont)
+    return () => socket.off(channel, handlePcUiFont)
+  }, [mac])
 
   return (
     <>
-      {/* 💻 Kompyuter raqami ko‘rinadi */}
+      {/* 💻 Kompyuter raqami ko‘rsatish */}
       {pcNumber && (
         <div
           style={{
@@ -108,29 +107,8 @@ export default function App() {
         </div>
       )}
 
-      {/* 🔐 Lock yoki o‘yin sahifasi */}
       {locked ? <LockScreen /> : <GamesPage />}
       <HotkeyPassword />
-
-      {/* 🧪 TEST BUTTON */}
-      <button
-        onClick={handleSendNumber}
-        style={{
-          position: 'absolute',
-          bottom: 20,
-          left: 20,
-          backgroundColor: '#007bff',
-          color: '#fff',
-          fontWeight: 'bold',
-          border: 'none',
-          borderRadius: '8px',
-          padding: '10px 20px',
-          cursor: 'pointer',
-          zIndex: 999
-        }}
-      >
-        Send Number to All PCs
-      </button>
     </>
   )
 }

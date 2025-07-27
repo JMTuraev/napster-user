@@ -10,15 +10,19 @@ export default function App() {
   const [mac, setMac] = useState(null)
   const [pcNumber, setPcNumber] = useState(null)
   const [fontSize, setFontSize] = useState(36)
+  const [bgUrl, setBgUrl] = useState(null)
 
-  // 🔐 1-USEEFFECT: MAC olish va status listenerlari (O'ZGARTIRMAYMIZ)
+  // 🧠 MAC address olish va status so‘rash
   useEffect(() => {
     let myMac = null
 
     window.api.getMac().then((addr) => {
       setMac(addr)
       myMac = addr
-      if (addr) socket.emit('get-status', addr)
+      if (addr) {
+        socket.emit('get-status', addr)
+        socket.emit('client-connected', addr)
+      }
     })
 
     const handleStatus = (data) => {
@@ -31,63 +35,77 @@ export default function App() {
       if (addr === myMac) setLocked(false)
     }
 
-    const handleBackgroundUpdate = ({ url }) => {
-      if (url) {
-        document.body.style.backgroundImage = `url(${url})`
-        document.body.style.backgroundSize = 'cover'
-        document.body.style.backgroundPosition = 'center'
-        document.body.style.backgroundRepeat = 'no-repeat'
-      }
-    }
-
     socket.on('status', handleStatus)
     socket.on('lock', handleLock)
     socket.on('unlock', handleUnlock)
-    socket.on('bg-update', handleBackgroundUpdate)
 
     return () => {
       socket.off('status', handleStatus)
       socket.off('lock', handleLock)
       socket.off('unlock', handleUnlock)
-      socket.off('bg-update', handleBackgroundUpdate)
     }
   }, [])
 
-  // 🆕 2-USEEFFECT: PC raqamini olish
+  // 🖥️ Kompyuter raqami va font o‘lchamini olish (mac tayyor bo‘lgach)
   useEffect(() => {
     if (!mac) return
 
     const channel = `receive-pc-ui-${mac}`
-    const handlePcUiNumber = (data) => {
-      if (data.mac === mac) {
-        console.log('🖥️ Kompyuter raqami:', data)
-        setPcNumber(data.number || null)
-      }
+
+    const handlePcUi = (data) => {
+      if (data.mac !== mac) return
+
+      console.log('📥 PC UI keldi:', data)
+      if (typeof data.font_size === 'number') setFontSize(data.font_size)
+      setPcNumber(data.show_number ? data.number || null : null)
     }
 
-    socket.on(channel, handlePcUiNumber)
-    return () => socket.off(channel, handlePcUiNumber)
-  }, [mac])
+    socket.on(channel, handlePcUi)
+    socket.emit('client-connected', mac)
 
-  // 🆕 3-USEEFFECT: Shrift o‘lchamini alohida olish
+    return () => {
+      socket.off(channel, handlePcUi)
+    }
+  }, [mac])
+  // 🎨 Fon rasmi olish: 1) dastlabki yuklanishda 2) socket orqali kelganda
   useEffect(() => {
-    if (!mac) return
+    // Dastlabki fon holatini so‘rash
+    socket.emit('get-selected-bg')
 
-    const channel = `receive-pc-ui-${mac}`
-    const handlePcUiFont = (data) => {
-      if (data.mac === mac && typeof data.font_size === 'number') {
-        console.log('🔠 Font o‘lchami:', data.font_size)
-        setFontSize(data.font_size)
-      }
+    // Admin’dan kelgan signal asosida fon yangilash
+    const handleSelectedBg = (bg) => {
+      console.log('✅ Tanlangan fon keldi:', bg)
+      setBgUrl(bg?.url || null)
     }
 
-    socket.on(channel, handlePcUiFont)
-    return () => socket.off(channel, handlePcUiFont)
-  }, [mac])
+    const handleBgUpdate = (data) => {
+      console.log('🆕 bg-update signal:', data)
+      setBgUrl(data?.url || null)
+    }
 
+    socket.on('selected-bg-data', handleSelectedBg)
+    socket.on('bg-update', handleBgUpdate)
+
+    return () => {
+      socket.off('selected-bg-data', handleSelectedBg)
+      socket.off('bg-update', handleBgUpdate)
+    }
+  }, [])
+
+  // 🖼️ UI chiqishi
   return (
-    <>
-      {/* 💻 Kompyuter raqami ko‘rsatish */}
+    <div
+      style={{
+        backgroundImage: bgUrl ? `url(${bgUrl})` : 'none',
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat',
+        height: '100vh',
+        width: '100vw',
+        overflow: 'hidden'
+      }}
+    >
+      {/* 💻 Kompyuter raqami UI */}
       {pcNumber && (
         <div
           style={{
@@ -107,8 +125,9 @@ export default function App() {
         </div>
       )}
 
+      {/* 🔐 Lock yoki Games sahifa */}
       {locked ? <LockScreen /> : <GamesPage />}
       <HotkeyPassword />
-    </>
+    </div>
   )
 }

@@ -26,19 +26,33 @@ function patchCSP() {
   })
 }
 
-// --- MAC addressni IPC orqali uzatish ---
-function getMacAddress() {
+// === Faqat Ethernet MAC olish ===
+function getStrictEthernetMac() {
   const nets = os.networkInterfaces()
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal && net.mac && net.mac !== '00:00:00:00:00:00') {
-        return net.mac
+  console.log('🌐 [DEBUG] Interfeyslar:', nets)
+
+  for (const [interfaceName, addresses] of Object.entries(nets)) {
+    if (!/^ethernet|eth\d*|enp\d*|lan|local area connection/i.test(interfaceName)) continue
+
+    for (const net of addresses) {
+      if (
+        net.family === 'IPv4' &&
+        !net.internal &&
+        net.mac &&
+        net.mac !== '00:00:00:00:00:00' &&
+        net.address
+      ) {
+        console.log(`✅ Ethernet MAC topildi [${interfaceName}]:`, net.mac)
+        return net.mac.toLowerCase()
       }
     }
   }
+
+  console.warn('⚠️ Ethernet MAC topilmadi')
   return null
 }
-ipcMain.handle('get-mac', () => getMacAddress())
+
+ipcMain.handle('get-mac', () => getStrictEthernetMac())
 
 // --- Yangi Window yaratish ---
 function createWindow() {

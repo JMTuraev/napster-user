@@ -1,11 +1,14 @@
+// src/main/index.js
 import { app, shell, BrowserWindow, ipcMain, session } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
-import os from 'os'
 import { registerGameHandlers } from './gameHandlers.js'
 import { registerHotkeyHandlers } from './hotkeyHandler.js'
 import { getEthernetMac } from '../utils/network.js'
+// ⚡️ AUTO UPDATE HANDLER — import qilamiz, faqat shunchaki (side effect)
+import './socketUpdateHandler.js'
+
 // --- CSP PATCH: SOCKET.IO va boshqa kerakli resurslar uchun ---
 function patchCSP() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {

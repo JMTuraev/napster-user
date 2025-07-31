@@ -5,7 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import os from 'os'
 import { registerGameHandlers } from './gameHandlers.js'
 import { registerHotkeyHandlers } from './hotkeyHandler.js'
-
+import { getEthernetMac } from '../utils/network.js'
 // --- CSP PATCH: SOCKET.IO va boshqa kerakli resurslar uchun ---
 function patchCSP() {
   session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
@@ -26,33 +26,8 @@ function patchCSP() {
   })
 }
 
-// === Faqat Ethernet MAC olish ===
-function getStrictEthernetMac() {
-  const nets = os.networkInterfaces()
-  console.log('🌐 [DEBUG] Interfeyslar:', nets)
-
-  for (const [interfaceName, addresses] of Object.entries(nets)) {
-    if (!/^ethernet|eth\d*|enp\d*|lan|local area connection/i.test(interfaceName)) continue
-
-    for (const net of addresses) {
-      if (
-        net.family === 'IPv4' &&
-        !net.internal &&
-        net.mac &&
-        net.mac !== '00:00:00:00:00:00' &&
-        net.address
-      ) {
-        console.log(`✅ Ethernet MAC topildi [${interfaceName}]:`, net.mac)
-        return net.mac.toLowerCase()
-      }
-    }
-  }
-
-  console.warn('⚠️ Ethernet MAC topilmadi')
-  return null
-}
-
-ipcMain.handle('get-mac', () => getStrictEthernetMac())
+// --- MAC address olish funksiyasi ---
+ipcMain.handle('get-mac', () => getEthernetMac())
 
 // --- Yangi Window yaratish ---
 function createWindow() {

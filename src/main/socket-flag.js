@@ -5,25 +5,16 @@ import fs from 'fs'
 import path from 'path'
 import { exec } from 'child_process'
 import os from 'os'
-
+import { getEthernetMac } from './utils/network.js'
 // 1. Asosiy path va fayllar
 const baseDir = 'C:\\GameBooking'
 const flagPath = path.join(baseDir, 'user_stop.flag')
 const userExeName = 'user.exe'
 
 // 2. MAC addressni aniqlash (birinchi IPv4 bo'yicha)
-function getMacAddress() {
-  const nets = os.networkInterfaces()
-  for (const name of Object.keys(nets)) {
-    for (const net of nets[name]) {
-      if (net.family === 'IPv4' && !net.internal && net.mac && net.mac !== '00:00:00:00:00:00') {
-        return net.mac
-      }
-    }
-  }
-  return null
-}
-const localMac = getMacAddress()?.toLowerCase()
+
+const localMac = getEthernetMac()
+
 console.log('[SOCKET-FLAG] LOCAL MAC:', localMac)
 
 // 3. Admin socket serverga ulanamiz (manzilini moslang!)

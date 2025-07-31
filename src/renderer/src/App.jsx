@@ -12,7 +12,7 @@ export default function App() {
   const [fontSize, setFontSize] = useState(36)
   const [bgUrl, setBgUrl] = useState(null)
 
-  // 🧠 MAC address olish va status so‘rash
+  // 🧠 MAC address olish va status so‘rash.
   useEffect(() => {
     let myMac = null
 

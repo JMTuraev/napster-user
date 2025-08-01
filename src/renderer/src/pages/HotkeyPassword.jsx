@@ -17,10 +17,17 @@ export default function HotkeyPassword() {
   }, [])
 
   // socket orqali parolni tekshiradi
+
   const handleSubmit = (enteredPassword) => {
     return new Promise((resolve) => {
-      socket.emit('check-owner-password', { password: enteredPassword }, (response) => {
-        resolve(response?.ok) // true/false qaytadi
+      socket.emit('check-owner-password', { password: enteredPassword }, async (response) => {
+        if (response?.ok) {
+          // Parol to‘g‘ri bo‘lsa, ilovani IPC orqali yopamiz:
+          if (window.api?.closeApp) {
+            await window.api.closeApp()
+          }
+        }
+        resolve(response?.ok)
       })
     })
   }

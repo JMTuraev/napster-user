@@ -32,6 +32,11 @@ function patchCSP() {
 // --- MAC address olish funksiyasi ---
 ipcMain.handle('get-mac', () => getEthernetMac())
 
+// --- APP-ni yopish IPC handler --- (QO'SHILDI)
+ipcMain.handle('close-app', () => {
+  app.quit()
+})
+
 // --- Yangi Window yaratish ---
 function createWindow() {
   const mainWindow = new BrowserWindow({

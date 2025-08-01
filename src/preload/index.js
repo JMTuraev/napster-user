@@ -12,6 +12,8 @@ const socket = io('http://192.168.1.10:3000', {
 
 // --- API obyekt: SOCKET + IPC funksiyalar ---
 const api = {
+  closeApp: () => ipcRenderer.invoke('close-app'), // <-- QO‘SHISH KERAK!
+
   // --- SOCKET funksiyalari ---
   socket: {
     on: (...args) => socket.on(...args),

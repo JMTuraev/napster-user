@@ -20,7 +20,7 @@ export default function LockScreen() {
       }}
     >
       <div>
-        🚫 <span style={{ color: '#f43' }}>LOCKED</span>
+        🚫 <span style={{ color: '#f43' }}> napster napster</span>
       </div>
       <div
         style={{

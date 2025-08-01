@@ -40,5 +40,26 @@
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "vite": "^6.2.6"
+  },
+  "build": {
+    "appId": "com.napster.user",
+    "productName": "napster-user",
+    "files": [
+      "out/**/*",
+      "resources/**/*",
+      "package.json"
+    ],
+    "directories": {
+      "buildResources": "resources"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "nsis": {
+      "oneClick": true,
+      "allowElevation": true,
+      "allowToChangeInstallationDirectory": false,
+      "runAfterFinish": true
+    }
   }
 }

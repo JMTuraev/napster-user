@@ -34,15 +34,33 @@ function patchCSP() {
 ipcMain.handle('get-mac', () => getEthernetMac())
 
 // --- APP-ni yopish IPC handler --- (EXPLORER SHELL + RESTART)
-
 ipcMain.handle('close-app', () => {
   console.log('[MAIN] close-app IPC KELDI!')
-  // Faqat explorer.exe’ni ochamiz (session uchun)
+
+  // --- Explorer.exe session uchun ochiladi (always)
   exec('start "" explorer.exe', (err) => {
     if (err) console.error('[KIOSK] explorer.exe start error:', err)
   })
-  // 100ms delay bilan app’ni yopamiz
-  setTimeout(() => app.quit(), 100)
+
+  // --- PS1 mavjud bo‘lsa, admin huquqda ochish uchun BAT fayl yaratamiz ---
+  const ps1Path = 'C:\\GameBooking\\restore-explorer.ps1'
+  const batPath = 'C:\\GameBooking\\restore-explorer.bat'
+
+  if (fs.existsSync(ps1Path)) {
+    const batContent = `
+@echo off
+powershell -Command "Start-Process 'powershell.exe' -ArgumentList '-ExecutionPolicy Bypass -File ${ps1Path}' -Verb runAs"
+    `
+    fs.writeFileSync(batPath, batContent.trim(), { encoding: 'utf8' })
+    exec(`start "" "${batPath}"`, (err) => {
+      if (err) console.error('[KIOSK] restore-explorer.bat start error:', err)
+    })
+    console.log('[MAIN] restore-explorer.ps1 admin bilan ishga tushirildi (BAT orqali)')
+  } else {
+    console.log('[MAIN] restore-explorer.ps1 topilmadi — faqat explorer.exe ochildi.')
+  }
+
+  setTimeout(() => app.quit(), 200)
   return { ok: true }
 })
 // --- Yangi Window yaratish ---

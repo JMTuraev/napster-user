@@ -6,7 +6,8 @@ import icon from '../../resources/icon.png?asset'
 import { registerGameHandlers } from './gameHandlers.js'
 import { registerHotkeyHandlers } from './hotkeyHandler.js'
 import { getEthernetMac } from '../utils/network.js'
-// ⚡️ AUTO UPDATE HANDLER — import qilamiz, faqat shunchaki (side effect)
+import { exec } from 'child_process'
+import fs from 'fs' // Kerakli bo‘lsa, bor yo‘qligini tekshiradi
 import './socketUpdateHandler.js'
 
 // --- CSP PATCH: SOCKET.IO va boshqa kerakli resurslar uchun ---
@@ -16,8 +17,8 @@ function patchCSP() {
       "default-src 'self'",
       "img-src 'self' data: http://localhost:3000 http://192.168.1.10:5173",
       "connect-src 'self' ws://localhost:3000 http://localhost:3000 ws://192.168.1.10:3000 http://192.168.1.10:3000 ws://192.168.0.100:3000 http://192.168.0.100:3000",
-      "script-src 'self' 'unsafe-inline'", // Faqat dev uchun
-      "style-src 'self' 'unsafe-inline'" // Inline style qo‘llab-quvvatlansin
+      "script-src 'self' 'unsafe-inline'",
+      "style-src 'self' 'unsafe-inline'"
     ].join('; ')
 
     callback({
@@ -32,9 +33,27 @@ function patchCSP() {
 // --- MAC address olish funksiyasi ---
 ipcMain.handle('get-mac', () => getEthernetMac())
 
-// --- APP-ni yopish IPC handler --- (QO'SHILDI)
+// --- APP-ni yopish IPC handler --- (EXPLORER SHELL + RESTART)
 ipcMain.handle('close-app', () => {
-  app.quit()
+  try {
+    const restoreScriptPath = 'C:\\GameBooking\\restore-explorer.ps1'
+    if (fs.existsSync(restoreScriptPath)) {
+      exec(`powershell -ExecutionPolicy Bypass -File "${restoreScriptPath}"`, (err) => {
+        if (err) console.error('[KIOSK] Explorer restore error:', err)
+        // Ilova baribir restart bo‘ladi, bu faqat xavfsizlik uchun
+        app.quit()
+      })
+      return { ok: true }
+    } else {
+      console.error('[KIOSK] restore-explorer.ps1 topilmadi')
+      app.quit()
+      return { ok: false, error: 'restore-explorer.ps1 topilmadi' }
+    }
+  } catch (err) {
+    console.error('[KIOSK] close-app xatolik:', err)
+    app.quit()
+    return { ok: false, error: err.message }
+  }
 })
 
 // --- Yangi Window yaratish ---
@@ -57,7 +76,6 @@ function createWindow() {
     }
   })
 
-  // ESC tugmasi bilan kioskdan chiqish
   mainWindow.webContents.on('before-input-event', (event, input) => {
     if (input.key === 'Escape') {
       console.log('🔓 ESC bosildi – kiosk mode off')
@@ -65,13 +83,11 @@ function createWindow() {
     }
   })
 
-  // Tashqi havolalarni browserda ochish
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
   })
 
-  // Dev yoki prod yuklash
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
     mainWindow.webContents.openDevTools()
@@ -80,7 +96,6 @@ function createWindow() {
   }
 }
 
-// --- App tayyor bo‘lsa ---
 app.whenReady().then(() => {
   patchCSP()
   electronApp.setAppUserModelId('com.electron')
@@ -100,7 +115,6 @@ app.whenReady().then(() => {
   })
 })
 
-// --- Barcha oynalar yopilsa, ilovani to‘xtatish ---
 app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit()
 })

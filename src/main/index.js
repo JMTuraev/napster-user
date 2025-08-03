@@ -34,28 +34,17 @@ function patchCSP() {
 ipcMain.handle('get-mac', () => getEthernetMac())
 
 // --- APP-ni yopish IPC handler --- (EXPLORER SHELL + RESTART)
-ipcMain.handle('close-app', () => {
-  try {
-    const restoreScriptPath = 'C:\\GameBooking\\restore-explorer.ps1'
-    if (fs.existsSync(restoreScriptPath)) {
-      exec(`powershell -ExecutionPolicy Bypass -File "${restoreScriptPath}"`, (err) => {
-        if (err) console.error('[KIOSK] Explorer restore error:', err)
-        // Ilova baribir restart bo‘ladi, bu faqat xavfsizlik uchun
-        app.quit()
-      })
-      return { ok: true }
-    } else {
-      console.error('[KIOSK] restore-explorer.ps1 topilmadi')
-      app.quit()
-      return { ok: false, error: 'restore-explorer.ps1 topilmadi' }
-    }
-  } catch (err) {
-    console.error('[KIOSK] close-app xatolik:', err)
-    app.quit()
-    return { ok: false, error: err.message }
-  }
-})
 
+ipcMain.handle('close-app', () => {
+  console.log('[MAIN] close-app IPC KELDI!')
+  // Faqat explorer.exe’ni ochamiz (session uchun)
+  exec('start "" explorer.exe', (err) => {
+    if (err) console.error('[KIOSK] explorer.exe start error:', err)
+  })
+  // 100ms delay bilan app’ni yopamiz
+  setTimeout(() => app.quit(), 100)
+  return { ok: true }
+})
 // --- Yangi Window yaratish ---
 function createWindow() {
   const mainWindow = new BrowserWindow({

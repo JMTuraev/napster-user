@@ -37,27 +37,23 @@ ipcMain.handle('get-mac', () => getEthernetMac())
 ipcMain.handle('close-app', () => {
   console.log('[MAIN] close-app IPC KELDI!')
 
-  // --- Explorer.exe session uchun ochiladi (always)
-  exec('start "" explorer.exe', (err) => {
-    if (err) console.error('[KIOSK] explorer.exe start error:', err)
-  })
-
-  // --- PS1 mavjud bo‘lsa, admin huquqda ochish uchun BAT fayl yaratamiz ---
   const ps1Path = 'C:\\GameBooking\\restore-explorer.ps1'
-  const batPath = 'C:\\GameBooking\\restore-explorer.bat'
-
   if (fs.existsSync(ps1Path)) {
+    // To'g'ridan-to'g'ri ps1 ni runAs bilan ishga tushirish
     const batContent = `
 @echo off
 powershell -Command "Start-Process 'powershell.exe' -ArgumentList '-ExecutionPolicy Bypass -File ${ps1Path}' -Verb runAs"
-    `
-    fs.writeFileSync(batPath, batContent.trim(), { encoding: 'utf8' })
+    `.trim()
+    const batPath = 'C:\\GameBooking\\restore-explorer.bat'
+    fs.writeFileSync(batPath, batContent, 'utf8')
     exec(`start "" "${batPath}"`, (err) => {
       if (err) console.error('[KIOSK] restore-explorer.bat start error:', err)
     })
-    console.log('[MAIN] restore-explorer.ps1 admin bilan ishga tushirildi (BAT orqali)')
   } else {
-    console.log('[MAIN] restore-explorer.ps1 topilmadi — faqat explorer.exe ochildi.')
+    // alternativ: scheduled task
+    exec('schtasks /Run /TN "GameBooking_RestoreExplorer"', (err) => {
+      if (err) console.error('[KIOSK] task run error:', err)
+    })
   }
 
   setTimeout(() => app.quit(), 200)

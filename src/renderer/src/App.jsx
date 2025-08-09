@@ -15,11 +15,16 @@ export default function App() {
   // 🧠 MAC address olish va status so‘rash.
   useEffect(() => {
     let myMac = null
+    const onConnect = () => {
+      if (myMac) socket.emit('new-user', { mac: myMac.toLowerCase() })
+    }
+    socket.on('connect', onConnect)
 
     window.api.getMac().then((addr) => {
       setMac(addr)
       myMac = addr
       if (addr) {
+        socket.emit('new-user', { mac: addr.toLowerCase() }) // <<< RO‘YXATGA OLISH
         socket.emit('get-status', addr)
         socket.emit('client-connected', addr)
       }
@@ -40,6 +45,7 @@ export default function App() {
     socket.on('unlock', handleUnlock)
 
     return () => {
+      socket.off('connect', onConnect)
       socket.off('status', handleStatus)
       socket.off('lock', handleLock)
       socket.off('unlock', handleUnlock)

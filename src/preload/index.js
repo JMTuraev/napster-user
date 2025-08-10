@@ -1,20 +1,23 @@
-// src/preload/index.js
-
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { io } from 'socket.io-client'
 
-// --- SOCKET ulanish (localhost yoki admin IP) ---
 const socket = io('http://192.168.1.10:3000', {
   transports: ['websocket'],
   reconnection: true
 })
 
-// --- API obyekt: SOCKET + IPC funksiyalar ---
 const api = {
-  closeApp: () => ipcRenderer.invoke('close-app'), // <-- QO‘SHISH KERAK!
+  // --- SWITCH USER (app yopilmaydi) ---
+  kiosk: {
+    switchToAdmin: () => ipcRenderer.invoke('kiosk:switch-to-admin'),
+    switchToGamer: () => ipcRenderer.invoke('kiosk:switch-to-gamer'),
+    // ixtiyoriy: qo'lda bo'shatish/tiklash
+    relax: () => ipcRenderer.invoke('kiosk:relax-full'),
+    restore: () => ipcRenderer.invoke('kiosk:restore-full')
+  },
 
-  // --- SOCKET funksiyalari ---
+  // --- SOCKET ---
   socket: {
     on: (...args) => socket.on(...args),
     off: (...args) => socket.off(...args),
@@ -23,10 +26,10 @@ const api = {
     id: () => socket.id
   },
 
-  // --- IPC funksiyalari ---
+  // --- Generic IPC ---
   invoke: (channel, data) => ipcRenderer.invoke(channel, data),
 
-  // --- getIcon: exe path uchun icon olish ---
+  // --- Icons / fayl util ---
   getIcon: async (exePath) => {
     try {
       const res = await ipcRenderer.invoke('extract-save-icon', exePath)
@@ -36,7 +39,6 @@ const api = {
     }
   },
 
-  // --- Fayl mavjudligini tekshirish ---
   checkPathExists: async (path) => {
     try {
       return await ipcRenderer.invoke('check-path-exists', path)
@@ -45,16 +47,12 @@ const api = {
     }
   },
 
-  // --- O‘yinni ishga tushirish ---
-  runGame: async (exePath) => {
-    try {
-      return await ipcRenderer.invoke('run-game', exePath)
-    } catch (err) {
-      return Promise.reject(err)
-    }
-  },
+  // --- Har qanday .exe ni kiosk-ruh bilan ishga tushirish ---
+  runExe: (opts) => ipcRenderer.invoke('kiosk:run-exe', opts),
 
-  // --- MAC address olish ---
+  // --- MUVOFIQLIK: eski runGame(exePath) ham 'run-exe'ga o‘raymiz ---
+  runGame: (exePath) => ipcRenderer.invoke('kiosk:run-exe', { path: exePath }),
+
   getMac: async () => {
     try {
       return await ipcRenderer.invoke('get-mac')
@@ -64,13 +62,11 @@ const api = {
   }
 }
 
-// --- Expose faqat bitta marta va contextIsolation rejimida ---
 try {
   if (process.contextIsolated) {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } else {
-    // Fallback (dev/prod uchun)
     if (!window.api) window.api = api
     if (!window.electron) window.electron = electronAPI
   }

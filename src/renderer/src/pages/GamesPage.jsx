@@ -1,18 +1,16 @@
-import React, { useEffect, useState, useRef } from 'react'
+// src/renderer/pages/GamesPage.jsx
+import React, { useEffect, useState } from 'react'
 
 export default function GamesPage() {
   const [allGames, setAllGames] = useState([])
   const [tabs, setTabs] = useState([])
   const [activeTabId, setActiveTabId] = useState(1)
 
-  // O‘yinlar va tabs’ni faqat bir marta socketdan olib kelamiz
   useEffect(() => {
     window.api.socket.emit('get-tabs')
     window.api.socket.emit('get-games')
 
-    // Faqat bir marta handler
     const handleGames = async (gamesList) => {
-      // Har bir o‘yin uchun icon PNG faqat bir marta yaratiladi
       const gamesWithIcons = []
       for (const game of gamesList) {
         try {
@@ -20,12 +18,10 @@ export default function GamesPage() {
           if (exists) {
             const iconName = game.exe.replace(/\.exe$/i, '') + '.png'
             const iconPath = `/icons/${iconName}`
-            await window.api.getIcon(game.path) // faqat bir marta PNG yaratadi
+            await window.api.getIcon(game.path)
             gamesWithIcons.push({ ...game, iconPath })
           }
-        } catch {
-          // ignore
-        }
+        } catch {}
       }
       setAllGames(gamesWithIcons)
     }
@@ -39,14 +35,22 @@ export default function GamesPage() {
     }
   }, [])
 
-  // Har doim activeTabId bo‘yicha filter — renderda filter
-  const games = allGames.filter((game) => game.tabId === activeTabId)
+  const games = allGames.filter((g) => g.tabId === activeTabId)
 
-  // O‘yinni ishga tushirish
-  const handleDoubleClick = (path) => {
-    window.api.runGame(path).catch((err) => {
-      window.alert?.('❌ O‘yin ishga tushmadi:\n' + err)
-    })
+  // ✅ YANGI: o‘yinni kiosk:run-exe orqali ishga tushiramiz
+  const handleDoubleClick = async (game) => {
+    try {
+      const payload = {
+        path: game.path, // majburiy
+        args: Array.isArray(game.args) ? game.args : [], // ixtiyoriy
+        cwd: game.cwd || undefined // ixtiyoriy (agar backenddan kelsa)
+        // lingerMs: 30000,            // xohlasangiz bu yerda override qiling
+      }
+      const res = await window.api.invoke('kiosk:run-exe', payload)
+      if (!res?.ok) throw new Error(res?.error || 'Unknown error')
+    } catch (err) {
+      window.alert?.('❌ O‘yin ishga tushmadi:\n' + (err?.message || err))
+    }
   }
 
   return (
@@ -74,6 +78,7 @@ export default function GamesPage() {
           </button>
         ))}
       </div>
+
       {/* Games grid */}
       <div
         style={{
@@ -93,7 +98,7 @@ export default function GamesPage() {
         {games.map((game) => (
           <div
             key={game.id}
-            onDoubleClick={() => handleDoubleClick(game.path)}
+            onDoubleClick={() => handleDoubleClick(game)}
             style={{
               backgroundColor: '#23243e',
               borderRadius: 16,

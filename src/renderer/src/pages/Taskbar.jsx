@@ -1,6 +1,7 @@
+// src/renderer/components/BottomTaskbar.jsx
 import React, { useEffect, useMemo, useState } from 'react'
 
-export default function Taskbar() {
+export default function BottomTaskbar() {
   const [wins, setWins] = useState([])
 
   useEffect(() => {
@@ -12,14 +13,14 @@ export default function Taskbar() {
       } catch {}
     }
     load()
-    const id = setInterval(load, 2500) // dinamik yangilash (2.5s)
+    const id = setInterval(load, 2000) // har 2s yangilash
     return () => {
       stop = true
       clearInterval(id)
     }
   }, [])
 
-  // exePath bo‘yicha guruhlash (bitta app — bitta badge)
+  // exePath || exeName:pid || hwnd bo‘yicha guruhlash (bitta app—bitta badge)
   const apps = useMemo(() => {
     const byKey = new Map()
     for (const w of wins) {
@@ -28,21 +29,101 @@ export default function Taskbar() {
       if (cur) cur.windows.push(w)
       else byKey.set(key, { ...w, windows: [w], __key: key })
     }
-    return Array.from(byKey.values())
+    return Array.from(byKey.values()).sort((a, b) =>
+      (a.exeName || '').localeCompare(b.exeName || '')
+    )
   }, [wins])
 
+  const onActivate = async (app) => {
+    const w = app.windows?.[0]
+    if (!w) return
+    // universal chaqiriq:
+    const res = await window.api.altTab.activateSmart({ pid: w.pid, hwnd: w.hwnd, title: w.title })
+    if (!res?.ok) console.warn('activate failed:', res)
+  }
   return (
-    <div className="flex items-center gap-2 px-3 py-2 border-t bg-black/30">
-      {!apps.length && <div className="text-xs opacity-60">App topilmadi…</div>}
+    <div
+      style={{
+        position: 'fixed',
+        left: 0,
+        right: 0,
+        bottom: 0,
+        height: 68,
+        display: 'flex',
+        alignItems: 'center',
+        gap: 10,
+        padding: '10px 14px',
+        background: 'rgba(15,18,30,0.75)',
+        backdropFilter: 'blur(8px)',
+        borderTop: '1px solid rgba(255,255,255,0.06)',
+        zIndex: 9999
+      }}
+    >
+      {apps.length === 0 && (
+        <div style={{ color: '#b9c2de', fontSize: 13, opacity: 0.75 }}>App topilmadi…</div>
+      )}
+
       {apps.map((app) => (
-        <div
-          key={app.exePath}
-          className="px-3 py-1.5 rounded-xl border shadow-sm text-left"
-          title={`${app.exePath}\nPID: ${app.pid}\nHWND: ${app.hwnd}`}
+        <button
+          key={app.__key}
+          onClick={() => onActivate(app)}
+          title={`${app.exeName || 'unknown.exe'}\n${app.exePath || ''}\n${app.title || ''}`}
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: 10,
+            padding: '6px 10px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.08)',
+            background: 'rgba(255,255,255,0.06)',
+            color: '#e9eefc',
+            cursor: 'pointer',
+            height: 44,
+            maxWidth: 220,
+            overflow: 'hidden'
+          }}
         >
-          <div className="text-[11px] opacity-70">{app.exeName || 'unknown.exe'}</div>
-          <div className="text-sm font-medium max-w-[220px] truncate">{app.title}</div>
-        </div>
+          {/* Icon */}
+          <img
+            src={app.exePath ? undefined : '/icons/default-icon.png'}
+            alt=""
+            onError={(e) => (e.currentTarget.src = '/icons/default-icon.png')}
+            style={{
+              width: 24,
+              height: 24,
+              borderRadius: 6,
+              background: 'rgba(0,0,0,0.35)'
+            }}
+            ref={async (img) => {
+              // exePath'dan icon olish (sizdagi IPC)
+              if (img && app.exePath) {
+                try {
+                  const iconUrl = await window.api.getIcon(app.exePath)
+                  if (iconUrl) img.src = iconUrl
+                } catch {}
+              }
+            }}
+          />
+
+          {/* Matnlar */}
+          <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
+            <div style={{ fontSize: 12, opacity: 0.8, lineHeight: '14px' }}>
+              {app.exeName || 'unknown.exe'}
+            </div>
+            <div
+              style={{
+                fontSize: 12,
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                maxWidth: 140,
+                lineHeight: '14px'
+              }}
+            >
+              {app.title || ''}
+            </div>
+          </div>
+        </button>
       ))}
     </div>
   )

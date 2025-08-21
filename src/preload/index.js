@@ -65,10 +65,11 @@ const api = {
 
   // --- Alt+Tab -> JSON (exePath bilan) ---
   altTab: {
-    // [{ hwnd, pid, title, className, exePath, exeName }]
-    list: () => ipcRenderer.invoke('altTab:list')
-    // Agar keyin aktivlashtirish qo‘shsangiz:
-    // activate: (hwnd) => ipcRenderer.invoke('altTab:activate', hwnd)
+    list: () => ipcRenderer.invoke('altTab:list'),
+    activate: (hwnd) => ipcRenderer.invoke('altTab:activate', hwnd), // hwnd fallback
+    activateByPid: (pid) => ipcRenderer.invoke('altTab:activateByPid', pid), // pid
+    activateSmart: (payload) => ipcRenderer.invoke('altTab:activateSmart', payload), // {pid, hwnd, title}
+    activateDiag: (payload) => ipcRenderer.invoke('altTab:activateDiag', payload) // diag
   }
 }
 

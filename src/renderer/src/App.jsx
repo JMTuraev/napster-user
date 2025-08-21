@@ -4,6 +4,7 @@ import socket from './socket'
 import LockScreen from './pages/LockScreen'
 import GamesPage from './pages/GamesPage'
 import HotkeyPassword from './pages/HotkeyPassword'
+import Taskbar from './pages/Taskbar'
 
 export default function App() {
   const [locked, setLocked] = useState(true)
@@ -134,6 +135,7 @@ export default function App() {
       {/* 🔐 Lock yoki Games sahifa */}
       {locked ? <LockScreen /> : <GamesPage />}
       <HotkeyPassword />
+      <Taskbar />
     </div>
   )
 }

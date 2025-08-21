@@ -1,7 +1,9 @@
+// src/preload/index.js
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 import { io } from 'socket.io-client'
 
+// --- Socket.io ---
 const socket = io('http://192.168.1.10:3000', {
   transports: ['websocket'],
   reconnection: true
@@ -33,7 +35,7 @@ const api = {
   getIcon: async (exePath) => {
     try {
       const res = await ipcRenderer.invoke('extract-save-icon', exePath)
-      return res.icon
+      return res?.icon ?? '/icons/default-icon.png'
     } catch {
       return '/icons/default-icon.png'
     }
@@ -59,6 +61,14 @@ const api = {
     } catch {
       return null
     }
+  },
+
+  // --- Alt+Tab -> JSON (exePath bilan) ---
+  altTab: {
+    // [{ hwnd, pid, title, className, exePath, exeName }]
+    list: () => ipcRenderer.invoke('altTab:list')
+    // Agar keyin aktivlashtirish qo‘shsangiz:
+    // activate: (hwnd) => ipcRenderer.invoke('altTab:activate', hwnd)
   }
 }
 
@@ -67,6 +77,7 @@ try {
     contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } else {
+    // Fallback (agar contextIsolation=false bo‘lsa)
     if (!window.api) window.api = api
     if (!window.electron) window.electron = electronAPI
   }

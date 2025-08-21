@@ -140,3 +140,51 @@ export function psAnyDescendantAlive(rootPid) {
     child.on('error', () => resolve(false))
   })
 }
+
+// === ALT+TAB-LIKE (P/Invoke-siz, faqat Get-Process): visible main window'lar ===
+export async function enumAltTabWindows() {
+  return new Promise((resolve) => {
+    const pwsh = getPwsh64()
+    const script = `
+$procs = Get-Process |
+  Where-Object {
+    $_.MainWindowHandle -ne 0 -and
+    -not [string]::IsNullOrWhiteSpace($_.MainWindowTitle)
+  } |
+  Sort-Object ProcessName, Id
+
+$items = foreach ($p in $procs) {
+  [pscustomobject]@{
+    hwnd    = ($p.MainWindowHandle.ToInt64().ToString())
+    pid     = $p.Id
+    title   = $p.MainWindowTitle
+    exeName = ($p.ProcessName + '.exe')
+    exePath = $p.Path   # bo'sh bo'lishi mumkin (ba'zi himoyalangan jarayonlar)
+  }
+}
+
+$items | ConvertTo-Json -Depth 4 -Compress
+`.trim()
+
+    const child = execFile(pwsh, ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-Command', script], {
+      windowsHide: true
+    })
+    let out = '',
+      err = ''
+    child.stdout.on('data', (d) => (out += String(d)))
+    child.stderr?.on?.('data', (d) => (err += String(d)))
+    child.on('exit', () => {
+      try {
+        const arr = JSON.parse(out.trim() || '[]')
+        resolve(Array.isArray(arr) ? arr : [])
+      } catch {
+        console.error('[enumAltTabWindows] parse fail. stderr=', err)
+        resolve([])
+      }
+    })
+    child.on('error', (e) => {
+      console.error('[enumAltTabWindows] exec error:', e?.message)
+      resolve([])
+    })
+  })
+}

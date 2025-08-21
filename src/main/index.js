@@ -10,7 +10,12 @@ import { getEthernetMac } from '../utils/network.js'
 import './socketUpdateHandler.js'
 
 // ✅ YANGI HANDLERS AGGREGATOR
-import { patchCSP, createWindow, createRunExeIPC } from './handlers/index.js'
+import {
+  patchCSP,
+  createWindow,
+  createRunExeIPC,
+  registerSwitcherHandlers
+} from './handlers/index.js'
 
 // MAC address IPC
 ipcMain.handle('get-mac', () => getEthernetMac())
@@ -18,7 +23,7 @@ ipcMain.handle('get-mac', () => getEthernetMac())
 app.whenReady().then(() => {
   patchCSP()
   electronApp.setAppUserModelId('com.electron')
-
+  registerSwitcherHandlers() // ⬅️ shu qo‘shiladi
   registerHotkeyHandlers()
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)

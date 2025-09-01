@@ -1,15 +1,9 @@
 // src/main/handlers/switcher.js
 import { ipcMain } from 'electron'
 import {
-  enumAltTabWindows,
-  bringToFrontByPid, // COM: WScript.Shell.AppActivate
-  bringToFrontByHwnd, // P/Invoke fallback
-  activationDiagnostics, // JSON diagnostika
-  activateWindowSmart, // (ixtiyoriy) ASFW + COM + P/Invoke kombo
-  waitForegroundStable // (ixtiyoriy) foreground barqarorligini kutish
+  enumAltTabWindows // Foreground barqarorligini kutish (ixtiyoriy)
 } from './powershell.js'
 import {
-  // Agar mavjud bo'lsa kuchli fokus-release util'lari; bo'lmasa fallback ishlatiladi
   beginFocusRelease,
   endFocusRelease,
   temporaryPassthrough,
@@ -21,28 +15,33 @@ let wired = false
 // --- FOKUSNI BO'SHATISH (AOT qaytarilmaydi) ---
 async function releaseFocus(ms = 700) {
   if (typeof beginFocusRelease === 'function') {
-    beginFocusRelease()
+    try {
+      beginFocusRelease()
+    } catch {}
     await new Promise((r) => setTimeout(r, ms))
     return
   }
   // fallback: AOT off + passthrough
-  setElectronAlwaysOnTop(false)
-  await temporaryPassthrough(Math.max(250, ms))
+  try {
+    setElectronAlwaysOnTop(false)
+  } catch {}
+  await temporaryPassthrough(Math.max(250, ms)).catch(() => {})
 }
 
 // --- FOKUSNI YAKUNLASH (AOT'ni QAYTARMAYMIZ!) ---
 function finishFocus() {
   if (typeof endFocusRelease === 'function') {
-    // endFocusRelease ichida ham AOT ni YOQMANG!
-    endFocusRelease()
+    try {
+      endFocusRelease()
+    } catch {}
   }
-  // ❗故意 AOT qaytarmaymiz — shu “sakrab tepaga chiqish”ni to‘xtatadi.
+  // atayin AOT ni qaytarmaymiz – “sakrash” bo‘lmasin
 }
 
 // --- Aktivatsiya + barqarorlikni kutish (bo'lsa) ---
 async function runActivationWithStability({ execFn, pid, hwnd }) {
   try {
-    await releaseFocus(700)
+    await releaseFocus(650)
 
     const okActivate = await execFn()
 
@@ -51,9 +50,9 @@ async function runActivationWithStability({ execFn, pid, hwnd }) {
       okStable = await waitForegroundStable({
         pid,
         hwnd,
-        timeout: 3500,
-        stableMs: 600,
-        interval: 120
+        timeout: 3000,
+        stableMs: 500,
+        interval: 100
       })
     }
 
@@ -79,13 +78,11 @@ export function registerSwitcherHandlers() {
     }
   })
 
-  // --- Diagnostika (to'liq JSON hisobot) ---
-  ipcMain.handle('altTab:activateDiag', async (_e, payload = {}) => {
-    try {
-      return await activationDiagnostics(payload) // { pid?, hwnd? }
-    } catch (e) {
-      return { ok: false, error: String(e?.message || e) }
-    }
+  // --- Diagnostika (eski og‘ir funksiyasiz; moslik uchun qoldirilgan) ---
+  ipcMain.handle('altTab:activateDiag', async () => {
+    // Hamma joyga proba logika tiqib, tizimni sekinlatish o‘rniga
+    // API mosligi uchun minimal javob qaytaramiz.
+    return { ok: false, unsupported: true, reason: 'activationDiagnostics removed for performance' }
   })
 
   // --- PID orqali aktivlashtirish (afzal usul) ---
@@ -112,20 +109,13 @@ export function registerSwitcherHandlers() {
     })
   })
 
-  // --- SMART: {pid, hwnd, title} qabul qiladi; activateWindowSmart bo'lsa undan foydalanadi.
+  // --- SMART (soddalashtirilgan): avval PID, keyin HWND ---
   ipcMain.handle('altTab:activateSmart', async (_e, payload = {}) => {
     const pid = Number(payload?.pid ?? 0)
     const hwnd = String(payload?.hwnd ?? '').trim()
-    const title = String(payload?.title ?? '')
 
     return await runActivationWithStability({
       execFn: async () => {
-        // 1) Agar activateWindowSmart mavjud bo'lsa — undan foydalanamiz
-        if (typeof activateWindowSmart === 'function') {
-          const okSmart = await activateWindowSmart({ pid, hwnd, title })
-          if (okSmart) return true
-        }
-        // 2) Aks holda, avval PID, keyin HWND bilan urinamiz
         if (Number.isFinite(pid) && pid > 0) {
           const okPid = await bringToFrontByPid(pid)
           if (okPid) return true
@@ -141,7 +131,16 @@ export function registerSwitcherHandlers() {
     })
   })
 
-  // --- Diagnostika: ro'yxat + sana/son ---
+  ipcMain.handle('altTab:listRaw', async () => {
+    try {
+      const arr = await enumAltTabWindows()
+      return { ok: true, count: arr.length, items: arr }
+    } catch (e) {
+      return { ok: false, error: String(e?.message || e) }
+    }
+  })
+
+  // --- Debug: ro'yxat + sanasi ---
   ipcMain.handle('altTab:listDebug', async () => {
     try {
       const items = await enumAltTabWindows()

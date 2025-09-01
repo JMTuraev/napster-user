@@ -3,7 +3,7 @@ import { ipcMain, BrowserWindow } from 'electron'
 import { spawn, execFile } from 'child_process'
 import { state } from './state.js'
 import {
-  findAnyHwndByExePathAllDesktops,
+  enumAltTabWindows,
   bringToFrontByHwnd,
   psAnyAliveByNames,
   psAnyDescendantAlive
@@ -14,6 +14,26 @@ import {
   setElectronAlwaysOnTop
 } from './electronUtils.js'
 
+/* ------------------------------ Mini cache ---------------------------------- */
+// Alt+Tab ro'yxatini 300 ms kesh: ketma-ket chaqiruvlar yengillashadi
+let _enumCache = { at: 0, data: [] }
+async function getAltTabFast(ms = 300) {
+  const now = Date.now()
+  if (now - _enumCache.at < ms) return _enumCache.data
+  const data = await enumAltTabWindows()
+  _enumCache = { at: now, data }
+  return data
+}
+
+// exePath bo'yicha birinchi HWND
+async function getHwndByExePath(exePath, { fresh = false } = {}) {
+  const lower = String(exePath || '').toLowerCase()
+  const list = fresh ? await enumAltTabWindows() : await getAltTabFast()
+  const item = list.find((w) => String(w.exePath || '').toLowerCase() === lower)
+  return item?.hwnd || ''
+}
+
+/* ------------------------------- IPC handlers ------------------------------- */
 export function createRunExeIPC() {
   ipcMain.handle('kiosk:run-exe', async (_e, payload = {}) => {
     const exePath = String(payload.path || '').trim()
@@ -35,22 +55,23 @@ export function createRunExeIPC() {
     const win = BrowserWindow.getAllWindows()[0]
     if (!win) return { ok: false, error: 'no window' }
 
-    // Electronni vaqtincha passtrough qilib yuboramiz
+    // Electronni vaqtincha passtrough + AOT off
     setElectronAlwaysOnTop(false)
-    temporaryPassthrough(500).catch(() => {})
+    temporaryPassthrough(400).catch(() => {})
 
-    // Avval mavjud oynani topishga urinamiz
-    const hwnd = await findAnyHwndByExePathAllDesktops(exePath)
+    // Avval mavjud oynani topamiz: kesh -> bo'lmasa fresh
+    let hwnd = await getHwndByExePath(exePath)
+    if (!hwnd) hwnd = await getHwndByExePath(exePath, { fresh: true })
     if (hwnd) {
       const ok = await bringToFrontByHwnd(hwnd)
       if (ok) return { ok: true, activated: true }
       // bo'lmasa yangi ochamiz
     }
 
-    // Yangi prokessni fullscreen flaglari bilan ishga tushirish
+    // Fullscreen flaglar
     if (forceFullscreen) {
-      if (baseName === 'chrome.exe') args = ['--start-fullscreen', ...args]
-      else if (baseName === 'msedge.exe') args = ['--start-fullscreen', ...args]
+      if (baseName === 'chrome.exe' || baseName === 'msedge.exe')
+        args = ['--start-fullscreen', ...args]
       else if (baseName === 'firefox.exe') args = ['-kiosk', ...args]
     }
 
@@ -59,28 +80,38 @@ export function createRunExeIPC() {
       state.running.add(child.pid)
       state.activeRuns += 1
 
-      // Oyna paydo bo'lgach, uni topib oldinga chiqaramiz
+      // Oyna chiqqach, ikki marta yengil aktivatsiya
       setTimeout(async () => {
-        const h = await findAnyHwndByExePathAllDesktops(exePath)
-        if (h) await bringToFrontByHwnd(h)
-      }, 700)
+        const h1 = await getHwndByExePath(exePath, { fresh: true })
+        if (h1) await bringToFrontByHwnd(h1)
+      }, 600)
 
-      // Watcher: bolalar protsesslari, nomlari va oynasi
+      setTimeout(async () => {
+        const h2 = await getHwndByExePath(exePath, { fresh: true })
+        if (h2) await bringToFrontByHwnd(h2)
+      }, 1200)
+
+      // Watcher: 1s; avval kesh, keyin talab bo‘lsa fresh bilan tasdiq
       const tick = setInterval(async () => {
-        const descendants = await psAnyDescendantAlive(child.pid)
-        const anyByName = await psAnyAliveByNames(watchNames)
-        const hasHwnd = !!(await findAnyHwndByExePathAllDesktops(exePath))
+        const [descendants, anyByName, hCached] = await Promise.all([
+          psAnyDescendantAlive(child.pid),
+          psAnyAliveByNames(watchNames),
+          getHwndByExePath(exePath)
+        ])
 
-        if (!descendants && !anyByName && !hasHwnd) {
-          clearInterval(tick)
-          state.running.delete(child.pid)
-          state.activeRuns = Math.max(0, state.activeRuns - 1)
-          if (state.activeRuns === 0) {
-            setElectronMousePassthrough(false)
-            setElectronAlwaysOnTop(true)
+        if (!descendants && !anyByName && !hCached) {
+          const hFresh = await getHwndByExePath(exePath, { fresh: true })
+          if (!hFresh) {
+            clearInterval(tick)
+            state.running.delete(child.pid)
+            state.activeRuns = Math.max(0, state.activeRuns - 1)
+            if (state.activeRuns === 0) {
+              setElectronMousePassthrough(false)
+              setElectronAlwaysOnTop(true)
+            }
           }
         }
-      }, 1200)
+      }, 1000)
 
       child.on('exit', () => {})
       child.on('close', () => {})
@@ -95,8 +126,11 @@ export function createRunExeIPC() {
   })
 
   // Faqat aktivatsiya (svernutdan qaytarish)
-  ipcMain.handle('kiosk:activate-exe', async (_e, exePath) => {
-    const h = await findAnyHwndByExePathAllDesktops(String(exePath || '').trim())
+  ipcMain.handle('kiosk:activate-exe', async (_e, exePathRaw) => {
+    const exePath = String(exePathRaw || '').trim()
+    if (!exePath) return { ok: false, error: 'bad-path' }
+    const h =
+      (await getHwndByExePath(exePath)) || (await getHwndByExePath(exePath, { fresh: true }))
     if (!h) return { ok: false, error: 'not-running' }
     const ok = await bringToFrontByHwnd(h)
     return { ok }
